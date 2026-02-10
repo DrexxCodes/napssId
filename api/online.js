@@ -224,7 +224,7 @@ function initializeCameraControls(regNumber) {
   openCameraBtn.addEventListener('click', async () => {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' },
+        video: { facingMode: 'environment' }, // Use rear camera (especially important for iPhone)
         audio: false 
       });
       video.srcObject = stream;
@@ -269,7 +269,7 @@ function initializeCameraControls(regNumber) {
     
     try {
       stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' },
+        video: { facingMode: 'environment' }, // Use rear camera
         audio: false 
       });
       video.srcObject = stream;
