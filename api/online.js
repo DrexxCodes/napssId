@@ -10,10 +10,10 @@ const firebaseConfig = {
   appId: "1:703066241181:web:2b995f41ed42b6ed1b7c74"
 };
 
-// Cloudinary configuration - HARDCODE YOUR KEYS HERE
+// Cloudinary configuration
 const CLOUDINARY_CONFIG = {
-  cloudName: "dehkozfhr",     // Replace with your Cloudinary cloud name
-  uploadPreset: "BoscoClothingsUploadServer" // Replace with your unsigned upload preset
+  cloudName: "dehkozfhr",     
+  uploadPreset: "BoscoClothingsUploadServer" 
 };
 
 // Initialize Firebase
@@ -224,14 +224,27 @@ function initializeCameraControls(regNumber) {
   openCameraBtn.addEventListener('click', async () => {
     try {
       stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, // Use rear camera (especially important for iPhone)
+        video: { 
+          facingMode: { exact: 'environment' } // Force rear camera with exact constraint
+        },
         audio: false 
       });
       video.srcObject = stream;
       openCameraBtn.classList.add('hidden');
       cameraPreview.classList.remove('hidden');
     } catch (error) {
-      alert('Error accessing camera: ' + error.message);
+      // Fallback if exact environment camera not available
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' },
+          audio: false 
+        });
+        video.srcObject = stream;
+        openCameraBtn.classList.add('hidden');
+        cameraPreview.classList.remove('hidden');
+      } catch (fallbackError) {
+        alert('Error accessing rear camera: ' + error.message);
+      }
     }
   });
   
@@ -269,15 +282,28 @@ function initializeCameraControls(regNumber) {
     
     try {
       stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, // Use rear camera
+        video: { 
+          facingMode: { exact: 'environment' } // Force rear camera
+        },
         audio: false 
       });
       video.srcObject = stream;
       openCameraBtn.classList.add('hidden');
       cameraPreview.classList.remove('hidden');
     } catch (error) {
-      alert('Error accessing camera: ' + error.message);
-      openCameraBtn.classList.remove('hidden');
+      // Fallback
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' },
+          audio: false 
+        });
+        video.srcObject = stream;
+        openCameraBtn.classList.add('hidden');
+        cameraPreview.classList.remove('hidden');
+      } catch (fallbackError) {
+        alert('Error accessing camera: ' + error.message);
+        openCameraBtn.classList.remove('hidden');
+      }
     }
   });
   
