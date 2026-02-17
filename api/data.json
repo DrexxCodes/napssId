@@ -400,7 +400,7 @@
     "date": "08-02-2026 11:51:28"
   },
   {
-    "reg_number": "208",
+    "reg_number": "2025134208",
     "full_name": "Nwachukwu Ifechukwu Winner",
     "date": "08-02-2026 11:57:39"
   },
@@ -908,5 +908,77 @@
     "reg_number": "2025134244",
     "full_name": "Okasia chukwudi wisdom",
     "date": "12-02-2026 02:34:36"
+  },
+  {
+    "reg_number": "2025134055",
+    "full_name": "Omatala Victoria ojochele",
+    "date": "VERIFY",
+    "_note": "Corrected from 20251314055 — extra '1' inserted; also appeared as 2025134055 directly in Excel"
+  },
+  {
+    "reg_number": "2025134071",
+    "full_name": "Ugorji praise nkwachukwu",
+    "date": "VERIFY",
+    "_note": "Valid reg number — not found in data.json"
+  },
+  {
+    "reg_number": "2025134128",
+    "full_name": "Onyia precious chinecherem",
+    "date": "VERIFY",
+    "_note": "Valid reg number — not found in data.json"
+  },
+  {
+    "reg_number": "2025134149",
+    "full_name": "Nduka chioma divinehealing",
+    "date": "06-02-2026 19:52:08",
+    "_note": "Corrected from 149 — student used 3-digit shorthand"
+  },
+  {
+    "reg_number": "2025134049",
+    "full_name": "Nwolise Anthony",
+    "date": "10-02-2026 15:38:59",
+    "_note": "Corrected from 49 — student used 2-digit shorthand, padded to 049"
+  },
+  {
+    "reg_number": "2025134098",
+    "full_name": "Anyika Obianuju Marycynthia",
+    "date": "10-02-2026 15:48:50",
+    "_note": "Corrected from 98 — student used 2-digit shorthand, padded to 098"
+  },
+  {
+    "reg_number": "2025134214",
+    "full_name": "Emmanuel confidence kosisochukwu",
+    "date": "10-02-2026 19:58:04",
+    "_note": "Corrected from 214 — student used 3-digit shorthand"
+  },
+  {
+    "reg_number": "2025134174",
+    "full_name": "Michael Victoria Chinemerem",
+    "date": "17-02-2026 00:14:00",
+    "_note": "Corrected from 2024134174 — wrong year prefix (2024 → 2025)"
+  },
+  {
+    "reg_number": "2025134245",
+    "full_name": "Agbo chioma peace",
+    "date": "16-02-2026 23:45:00",
+    "_note": "Valid reg number — not found in data.json"
+  },
+  {
+    "reg_number": "2025134156",
+    "full_name": "Nwoye chiagozie favour",
+    "date": "16-02-2026 23:50:00",
+    "_note": "Valid reg number — not found in data.json"
+  },
+  {
+    "reg_number": "2025134269",
+    "full_name": "Uzor Chisom Angel",
+    "date": "04-02-2026 16:26:57",
+    "_note": "Valid reg number — not found in data.json"
+  },
+  {
+    "reg_number": "2025134010",
+    "full_name": "Emereonye Emmanuel Ekenedirichukwu",
+    "date": "16-02-2026 23:55:00",
+    "_note": "Valid reg number — not found in data.json"
   }
 ]
