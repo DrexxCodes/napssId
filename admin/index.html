@@ -5,189 +5,764 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NAPSS UNIZIK - Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #065f46 0%, #10b981 100%);
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap');
+        * { font-family: 'Outfit', sans-serif; box-sizing: border-box; }
+        .gradient-bg { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
+        .card-hover { transition: transform 0.25s, box-shadow 0.25s; }
+        .card-hover:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(16,185,129,0.22); }
+        @keyframes pulse-ring {
+            0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.5);}
+            50%{box-shadow:0 0 0 10px rgba(16,185,129,0);}
         }
-        
-        .card-hover:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+        #exportAssetsBtn:not(:disabled){ animation: pulse-ring 2.5s infinite; }
+        @keyframes shimmer {
+            0%{background-position:-200% 0;} 100%{background-position:200% 0;}
         }
-        
-        .search-highlight {
-            background-color: #fef08a;
+        .progress-shimmer {
+            background: linear-gradient(90deg,#059669 25%,#34d399 50%,#059669 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite;
         }
+        @keyframes slideUp {
+            from{opacity:0;transform:translateY(30px);} to{opacity:1;transform:translateY(0);}
+        }
+        .modal-card { animation: slideUp 0.35s cubic-bezier(.22,1,.36,1) both; }
+        ::-webkit-scrollbar{width:6px;}
+        ::-webkit-scrollbar-track{background:#f0fdf4;}
+        ::-webkit-scrollbar-thumb{background:#10b981;border-radius:99px;}
+        .student-row { transition: background 0.12s; cursor: pointer; }
+        .student-row:hover { background: #f0fdf4; }
+        .student-row.selected { background: #d1fae5; }
+        .thumb-img { width:36px;height:36px;border-radius:8px;object-fit:cover;border:2px solid #10b981;display:block; }
+        .thumb-placeholder { width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#d1fae5,#6ee7b7);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#065f46;border:2px solid #10b981; }
+        @keyframes spin { to{transform:rotate(360deg);} }
+        .spinner { display:inline-block;width:18px;height:18px;border:3px solid #d1fae5;border-top-color:#059669;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle; }
+        .tab-btn { transition:all 0.2s;border:2px solid transparent; }
+        .tab-btn.tab-active-ready { background:#065f46;color:white;border-color:#065f46; }
+        .tab-btn.tab-active-nophoto { background:#d97706;color:white;border-color:#d97706; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-green-50 to-emerald-50 min-h-screen">
-    <!-- Header -->
-    <header class="gradient-bg text-white py-6 shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-4">
-            <h1 class="text-3xl md:text-4xl font-bold text-center">
-                🎓 NAPSS UNIZIK - Admin Dashboard
-            </h1>
-            <p class="text-center text-green-100 mt-2">
-                Student Card Management System
-            </p>
+
+<!-- HEADER -->
+<header class="gradient-bg text-white py-5 shadow-xl sticky top-0 z-50">
+    <div class="container mx-auto px-4 flex items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">🎓 NAPSS UNIZIK</h1>
+            <p class="text-green-200 text-xs font-semibold tracking-widest uppercase mt-0.5">Admin Dashboard · Card Management</p>
         </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-8">
-        <!-- Stats and Search Section -->
-        <div class="bg-white rounded-2xl shadow-xl p-6 mb-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
-                    <div class="text-3xl font-bold text-green-600" id="totalStudents">--</div>
-                    <div class="text-gray-600 font-semibold">Total Students</div>
-                </div>
-                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-                    <div class="text-3xl font-bold text-blue-600" id="filteredCount">--</div>
-                    <div class="text-gray-600 font-semibold">Showing</div>
-                </div>
-                <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-lg">
-                    <div class="text-3xl font-bold text-purple-600">2025</div>
-                    <div class="text-gray-600 font-semibold">Academic Year</div>
-                </div>
-            </div>
-
-            <!-- Search Bar -->
-            <div class="relative">
-                <input 
-                    type="text" 
-                    id="searchInput"
-                    placeholder="Search by name or registration number..."
-                    class="w-full px-4 py-3 pl-12 border-2 border-green-300 rounded-lg focus:outline-none focus:border-green-500 transition-all"
-                />
-                <svg class="w-6 h-6 text-gray-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                </svg>
-            </div>
-        </div>
-
-        <!-- Students List -->
-        <div id="studentsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Students will be loaded here -->
-        </div>
-
-        <!-- Loading State -->
-        <div id="loadingState" class="text-center py-12">
-            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-green-500 border-t-transparent"></div>
-            <p class="text-gray-600 mt-4">Loading students...</p>
-        </div>
-
-        <!-- Empty State -->
-        <div id="emptyState" class="hidden text-center py-12">
-            <svg class="w-24 h-24 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        <button id="exportAssetsBtn"
+            class="bg-white text-green-700 hover:bg-green-50 active:scale-95 font-extrabold py-3 px-5 rounded-xl transition-all flex items-center gap-2.5 shadow-lg text-sm whitespace-nowrap"
+            onclick="openExportAssets()">
+            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
             </svg>
-            <p class="text-gray-600 text-lg">No students found</p>
-        </div>
-    </main>
+            Export Assets
+        </button>
+    </div>
+</header>
 
-    <script>
-        let allStudents = [];
-        let filteredStudents = [];
+<!-- ═══════════ EXPORT ASSETS MODAL ═══════════ -->
+<div id="assetsModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 overflow-y-auto">
+    <div class="min-h-full flex items-start justify-center py-6 px-4">
+        <div class="modal-card bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden">
 
-        // Load student data
-        async function loadStudents() {
-            try {
-                const response = await fetch('../api/data.json');
-                const data = await response.json();
-                allStudents = data;
-                filteredStudents = data;
-                
-                document.getElementById('totalStudents').textContent = data.length;
-                document.getElementById('filteredCount').textContent = data.length;
-                
-                renderStudents(data);
-                document.getElementById('loadingState').classList.add('hidden');
-            } catch (error) {
-                console.error('Error loading students:', error);
-                document.getElementById('loadingState').innerHTML = `
-                    <p class="text-red-600">Error loading students. Please refresh the page.</p>
-                `;
-            }
-        }
-
-        // Render students list
-        function renderStudents(students) {
-            const container = document.getElementById('studentsList');
-            
-            if (students.length === 0) {
-                container.classList.add('hidden');
-                document.getElementById('emptyState').classList.remove('hidden');
-                return;
-            }
-
-            container.classList.remove('hidden');
-            document.getElementById('emptyState').classList.add('hidden');
-            
-            container.innerHTML = students.map(student => `
-                <div class="bg-white rounded-xl shadow-lg p-6 card-hover transition-all duration-300">
-                    <div class="flex items-start justify-between mb-4">
-                        <div class="flex-1">
-                            <h3 class="text-lg font-bold text-gray-800 mb-2 break-words">
-                                ${escapeHtml(student.full_name)}
-                            </h3>
-                            <div class="flex items-center text-sm text-gray-600 mb-1">
-                                <svg class="w-4 h-4 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
-                                </svg>
-                                <span class="font-mono font-semibold">${student.reg_number}</span>
-                            </div>
-                            <div class="flex items-center text-xs text-gray-500">
-                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                                ${student.date.split(' ')[0]}
-                            </div>
-                        </div>
-                        <div class="ml-2 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
-                            Active
-                        </div>
-                    </div>
-                    
-                    <a href="data.html?reg=${encodeURIComponent(student.reg_number)}" 
-                       class="block w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-3 px-4 rounded-lg text-center transition-all transform hover:scale-105">
-                        View Profile →
-                    </a>
+            <!-- Modal Header -->
+            <div class="gradient-bg px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-white font-extrabold text-xl">Export Assets</h2>
+                    <p class="text-green-200 text-xs mt-0.5">Fetch from Firestore · Preview · Select · Download ZIP</p>
                 </div>
-            `).join('');
+                <button onclick="closeAssetsModal()" class="text-white hover:text-green-200 transition-colors">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Loading state -->
+            <div id="modalLoadingState" class="py-20 text-center">
+                <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-green-500 border-t-transparent mb-4"></div>
+                <p class="text-gray-600 font-bold text-sm" id="modalLoadingText">Fetching student data from Firestore...</p>
+                <p class="text-gray-400 text-xs mt-2" id="modalLoadingSubtext">This may take a moment for large datasets</p>
+            </div>
+
+            <!-- Main content (shown after fetch) -->
+            <div id="modalContent" class="hidden">
+
+                <!-- Stats bar -->
+                <div class="bg-green-50 border-b border-green-100 px-6 py-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                        <span class="text-xs font-bold text-green-800">Ready: <span id="statReady" class="text-green-600">--</span></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 bg-amber-400 rounded-full"></div>
+                        <span class="text-xs font-bold text-amber-700">No Photo: <span id="statNoPhoto" class="text-amber-600">--</span></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
+                        <span class="text-xs font-bold text-blue-800">Selected: <span id="statSelected" class="text-blue-600">0</span></span>
+                    </div>
+                    <div class="ml-auto">
+                        <input type="text" id="modalSearch" placeholder="Search..."
+                            class="text-xs border-2 border-green-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-green-500 font-semibold w-44"/>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="flex gap-2 px-6 pt-4">
+                    <button class="tab-btn tab-active-ready text-xs font-bold px-4 py-2 rounded-lg border-2 border-green-700"
+                        id="tabBtnReady" onclick="switchTab('ready')">✅ Ready for Export</button>
+                    <button class="tab-btn text-xs font-bold px-4 py-2 rounded-lg border-2 border-amber-300 text-amber-700"
+                        id="tabBtnNoPhoto" onclick="switchTab('nophoto')">⚠️ No Profile Photo</button>
+                </div>
+
+                <!-- Ready tab content -->
+                <div id="tabReadyContent" class="px-6 py-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <button onclick="selectAll()" class="text-xs bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-1.5 rounded-lg transition-all">Select All</button>
+                        <button onclick="deselectAll()" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold px-3 py-1.5 rounded-lg transition-all">Deselect All</button>
+                        <span class="text-xs text-gray-400 font-medium hidden sm:inline">Click a row or checkbox to toggle</span>
+                    </div>
+                    <div class="border-2 border-green-100 rounded-xl overflow-hidden" style="max-height:280px;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                        <table class="text-xs" style="min-width:520px;width:100%;">
+                            <thead class="bg-green-700 text-white sticky top-0 z-10">
+                                <tr>
+                                    <th class="w-10 py-2.5 px-3 text-left">
+                                        <input type="checkbox" id="masterCheck" onchange="toggleMaster(this)" class="w-4 h-4 cursor-pointer" title="Select / Deselect all visible"/>
+                                    </th>
+                                    <th class="py-2.5 px-3 text-left font-bold">Photo</th>
+                                    <th class="py-2.5 px-3 text-left font-bold">Name</th>
+                                    <th class="py-2.5 px-3 text-left font-bold">Reg Number</th>
+                                    <th class="py-2.5 px-3 text-left font-bold">Phone</th>
+                                </tr>
+                            </thead>
+                            <tbody id="readyTableBody">
+                                <tr><td colspan="5" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- No-photo tab content -->
+                <div id="tabNoPhotoContent" class="hidden px-6 py-4">
+                    <div class="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 mb-3">
+                        <p class="text-amber-800 font-bold text-xs">⚠️ These students have no profile photo in Firestore. They are <strong>excluded from the export queue</strong>. Ask them to upload their photo, then re-open this dialog.</p>
+                    </div>
+                    <div class="border-2 border-amber-100 rounded-xl overflow-hidden" style="max-height:280px;overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                        <table class="text-xs" style="min-width:520px;width:100%;">
+                            <thead class="bg-amber-500 text-white sticky top-0 z-10">
+                                <tr>
+                                    <th class="py-2.5 px-3 text-left font-bold">#</th>
+                                    <th class="py-2.5 px-3 text-left font-bold">Name</th>
+                                    <th class="py-2.5 px-3 text-left font-bold">Reg Number</th>
+                                    <th class="py-2.5 px-3 text-left font-bold">Phone</th>
+                                    <th class="py-2.5 px-3 text-left font-bold">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="noPhotoTableBody">
+                                <tr><td colspan="5" class="text-center py-8 text-gray-400">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Export Progress -->
+                <div id="exportProgressSection" class="hidden mx-6 mb-4 bg-green-50 border border-green-200 rounded-xl p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="font-bold text-green-800 text-sm" id="exportStatusText">Generating assets...</span>
+                        <span class="font-bold text-green-600 text-sm" id="exportPctText">0%</span>
+                    </div>
+                    <div class="bg-green-200 rounded-full h-3 overflow-hidden mb-2">
+                        <div id="exportProgressBar" class="progress-shimmer h-full rounded-full transition-all duration-500" style="width:0%"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-green-700 font-semibold mt-1">
+                        <span id="exportCountText">0 / 0 students</span>
+                        <span id="exportCurrentStudent" class="truncate max-w-[55%] text-right">Initializing...</span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex flex-wrap gap-3 justify-end px-6 pb-6" id="exportActionBtns">
+                    <button onclick="closeAssetsModal()"
+                        class="px-6 py-3 rounded-xl border-2 border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition-all text-sm">
+                        Cancel
+                    </button>
+                    <button id="startExportBtn" onclick="startAssetsExport()"
+                        class="px-8 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-extrabold transition-all flex items-center gap-2.5 shadow-lg text-sm active:scale-95">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        Export Selected as ZIP
+                    </button>
+                </div>
+
+            </div><!-- /modalContent -->
+        </div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<main class="container mx-auto px-4 py-8">
+    <div class="bg-white rounded-2xl shadow-xl p-6 mb-8 border border-green-50">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-xl">
+                <div class="text-3xl font-extrabold text-green-600" id="totalStudents">--</div>
+                <div class="text-gray-500 font-semibold text-xs mt-1 uppercase tracking-wide">Total Students</div>
+            </div>
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl">
+                <div class="text-3xl font-extrabold text-blue-600" id="filteredCount">--</div>
+                <div class="text-gray-500 font-semibold text-xs mt-1 uppercase tracking-wide">Showing</div>
+            </div>
+            <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-xl">
+                <div class="text-3xl font-extrabold text-purple-600">2025</div>
+                <div class="text-gray-500 font-semibold text-xs mt-1 uppercase tracking-wide">Academic Year</div>
+            </div>
+        </div>
+        <div class="relative">
+            <input type="text" id="searchInput" placeholder="Search by name or registration number..."
+                class="w-full px-4 py-3 pl-12 border-2 border-green-200 rounded-xl focus:outline-none focus:border-green-500 transition-all text-sm font-medium"/>
+            <svg class="w-5 h-5 text-gray-400 absolute left-4 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+        </div>
+    </div>
+    <div id="studentsList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5"></div>
+    <div id="loadingState" class="text-center py-20">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-green-500 border-t-transparent mb-4"></div>
+        <p class="text-gray-400 font-semibold">Loading students...</p>
+    </div>
+    <div id="emptyState" class="hidden text-center py-20">
+        <svg class="w-16 h-16 mx-auto text-gray-200 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p class="text-gray-400 font-bold">No students found</p>
+    </div>
+</main>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// FIREBASE INIT
+// ═══════════════════════════════════════════════════════════════════
+const firebaseConfig = {
+    apiKey: "AIzaSyDIiht0HgpOoEexwAcEFfCFRtb8WtTho0c",
+    authDomain: "cobaltai-6c012.firebaseapp.com",
+    projectId: "cobaltai-6c012",
+    storageBucket: "cobaltai-6c012.firebasestorage.app",
+    messagingSenderId: "703066241181",
+    appId: "1:703066241181:web:2b995f41ed42b6ed1b7c74"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD DATA
+// ═══════════════════════════════════════════════════════════════════
+let allStudents      = [];
+let filteredStudents = [];
+
+function escH(t){ return String(t||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+
+async function loadStudents() {
+    try {
+        const res  = await fetch('../api/data.json');
+        const data = await res.json();
+        allStudents = filteredStudents = data;
+        document.getElementById('totalStudents').textContent = data.length;
+        document.getElementById('filteredCount').textContent = data.length;
+        renderStudents(data);
+        document.getElementById('loadingState').classList.add('hidden');
+    } catch(e) {
+        document.getElementById('loadingState').innerHTML =
+            '<p class="text-red-500 font-semibold">Error loading students. Please refresh.</p>';
+    }
+}
+
+function renderStudents(students) {
+    const el = document.getElementById('studentsList');
+    if (!students.length) {
+        el.classList.add('hidden');
+        document.getElementById('emptyState').classList.remove('hidden');
+        return;
+    }
+    el.classList.remove('hidden');
+    document.getElementById('emptyState').classList.add('hidden');
+    el.innerHTML = students.map(s => `
+        <div class="bg-white rounded-xl shadow-md p-5 card-hover border border-gray-50">
+            <div class="flex items-start justify-between mb-3">
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-sm font-bold text-gray-800 mb-1.5 leading-snug">${escH(s.full_name)}</h3>
+                    <div class="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded inline-block mb-1">${escH(s.reg_number)}</div>
+                    <div class="text-xs text-gray-400">${(s.date||'').split(' ')[0]}</div>
+                </div>
+                <span class="ml-2 bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0">Active</span>
+            </div>
+            <a href="data.html?reg=${encodeURIComponent(s.reg_number)}"
+               class="block w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg text-center text-xs transition-all">
+                View Profile →
+            </a>
+        </div>`).join('');
+}
+
+document.getElementById('searchInput').addEventListener('input', function(e) {
+    const q = e.target.value.toLowerCase().trim();
+    filteredStudents = q ? allStudents.filter(s =>
+        s.full_name.toLowerCase().includes(q) || s.reg_number.toLowerCase().includes(q)) : allStudents;
+    document.getElementById('filteredCount').textContent = filteredStudents.length;
+    renderStudents(filteredStudents);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// QR HELPER — returns dataURL string
+// ═══════════════════════════════════════════════════════════════════
+function makeQRDataURL(text, size) {
+    return new Promise(resolve => {
+        const div = document.createElement('div');
+        div.style.cssText = 'position:fixed;left:-9999px;top:0;';
+        document.body.appendChild(div);
+        try {
+            new QRCode(div, {
+                text, width: size || 300, height: size || 300,
+                colorDark: '#1a5c2e', colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            setTimeout(() => {
+                const el = div.querySelector('img') || div.querySelector('canvas');
+                if (!el) { document.body.removeChild(div); return resolve(null); }
+                const src = el.tagName === 'IMG' ? el.src : el.toDataURL();
+                document.body.removeChild(div);
+                resolve(src);
+            }, 450);
+        } catch(e) { document.body.removeChild(div); resolve(null); }
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// IMAGE FETCH → dataURL
+// ═══════════════════════════════════════════════════════════════════
+async function fetchImageAsDataURL(url) {
+    if (!url) return null;
+    try {
+        const res  = await fetch(url);
+        const blob = await res.blob();
+        return await new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.onload  = () => res(reader.result);
+            reader.onerror = rej;
+            reader.readAsDataURL(blob);
+        });
+    } catch(e) {
+        // CORS fallback: draw to canvas
+        return new Promise(resolve => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                try {
+                    const c = document.createElement('canvas');
+                    c.width = img.width; c.height = img.height;
+                    c.getContext('2d').drawImage(img, 0, 0);
+                    resolve(c.toDataURL('image/jpeg', 0.92));
+                } catch(e2) { resolve(null); }
+            };
+            img.onerror = () => resolve(null);
+            img.src = url;
+        });
+    }
+}
+
+function dataURLtoUint8(dataURL) {
+    const b64 = dataURL.split(',')[1];
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// METADATA PDF — A5, plain, no images
+// ═══════════════════════════════════════════════════════════════════
+function buildMetadataPDF(student) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+    const W   = doc.internal.pageSize.getWidth();
+    const H   = doc.internal.pageSize.getHeight();
+
+    // Header bar
+    doc.setFillColor(6, 95, 70);
+    doc.rect(0, 0, W, 30, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('NAPSS UNIZIK', W / 2, 13, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('NATIONAL ASSOCIATION OF POLITICAL SCIENCE STUDENTS', W / 2, 20, { align: 'center' });
+    doc.text('NNAMDI AZIKIWE UNIVERSITY CHAPTER', W / 2, 26, { align: 'center' });
+
+    // Fields
+    let y = 46;
+    function field(label, value) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.5);
+        doc.setTextColor(6, 95, 70);
+        doc.text(label, 18, y);
+        y += 6;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(12);
+        doc.setTextColor(17, 24, 39);
+        doc.text(String(value || '—'), 18, y);
+        y += 3;
+        doc.setDrawColor(229, 231, 235);
+        doc.setLineWidth(0.3);
+        doc.line(18, y, W - 18, y);
+        y += 10;
+    }
+
+    field('FULL NAME',           student.full_name);
+    field('REGISTRATION NUMBER', student.reg_number);
+    field('PHONE NUMBER',        student.phoneNumber || '—');
+
+    // Note about separate files
+    y += 4;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(107, 114, 128);
+    const note = 'Profile photo and QR codes are included separately in this student folder.';
+    doc.text(note, 18, y, { maxWidth: W - 36 });
+
+    // Footer
+    const footerY = H - 14;
+    doc.setFillColor(243, 244, 246);
+    doc.rect(0, footerY - 5, W, 19, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(6, 95, 70);
+    doc.text('Developed by Drexx Technologies', W / 2, footerY + 3, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(156, 163, 175);
+    doc.text('NAPSS UNIZIK Card Management System', W / 2, footerY + 9, { align: 'center' });
+
+    return doc.output('arraybuffer');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MODAL STATE
+// ═══════════════════════════════════════════════════════════════════
+let readyStudents   = [];
+let noPhotoStudents = [];
+let selectedSet     = new Set();
+let modalFetched    = false;
+
+async function openExportAssets() {
+    if (!allStudents.length) { alert('No students loaded yet.'); return; }
+
+    document.getElementById('assetsModal').classList.remove('hidden');
+    document.getElementById('modalLoadingState').classList.remove('hidden');
+    document.getElementById('modalContent').classList.add('hidden');
+    document.getElementById('exportProgressSection').classList.add('hidden');
+
+    if (modalFetched) {
+        // Re-show cached data
+        document.getElementById('modalLoadingState').classList.add('hidden');
+        document.getElementById('modalContent').classList.remove('hidden');
+        renderModalTables(readyStudents, noPhotoStudents);
+        updateStats();
+        return;
+    }
+
+    // Fresh fetch from Firestore
+    readyStudents   = [];
+    noPhotoStudents = [];
+    selectedSet     = new Set();
+
+    const total = allStudents.length;
+    document.getElementById('modalLoadingSubtext').textContent = `Loading ${total} students — please wait`;
+
+    const BATCH = 12;
+    let done = 0;
+
+    for (let i = 0; i < allStudents.length; i += BATCH) {
+        const slice = allStudents.slice(i, i + BATCH);
+        await Promise.all(slice.map(async s => {
+            try {
+                const snap  = await db.collection('enrollments').doc(s.reg_number).get();
+                const fsDoc = snap.exists ? snap.data() : null;
+                const enriched = {
+                    ...s,
+                    phoneNumber: fsDoc?.phoneNumber || null,
+                    profileURL:  fsDoc?.profileURL  || null,
+                };
+                if (enriched.profileURL) {
+                    readyStudents.push(enriched);
+                } else {
+                    noPhotoStudents.push(enriched);
+                }
+            } catch {
+                noPhotoStudents.push({ ...s, phoneNumber: null, profileURL: null });
+            }
+            done++;
+            document.getElementById('modalLoadingSubtext').textContent =
+                `Fetched ${done} / ${total} students...`;
+        }));
+    }
+
+    // Sort alphabetically
+    const byName = (a, b) => a.full_name.localeCompare(b.full_name);
+    readyStudents.sort(byName);
+    noPhotoStudents.sort(byName);
+
+    // Default: all ready students selected
+    readyStudents.forEach(s => selectedSet.add(s.reg_number));
+
+    modalFetched = true;
+    renderModalTables(readyStudents, noPhotoStudents);
+    updateStats();
+    switchTab('ready');
+
+    document.getElementById('modalLoadingState').classList.add('hidden');
+    document.getElementById('modalContent').classList.remove('hidden');
+}
+
+function closeAssetsModal() {
+    document.getElementById('assetsModal').classList.add('hidden');
+    document.getElementById('exportProgressSection').classList.add('hidden');
+    const btn = document.getElementById('startExportBtn');
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+    </svg> Export Selected as ZIP`;
+    document.getElementById('exportActionBtns').classList.remove('hidden');
+}
+
+function switchTab(tab) {
+    const isReady = tab === 'ready';
+    document.getElementById('tabReadyContent').classList.toggle('hidden', !isReady);
+    document.getElementById('tabNoPhotoContent').classList.toggle('hidden',  isReady);
+    const rb = document.getElementById('tabBtnReady');
+    const nb = document.getElementById('tabBtnNoPhoto');
+    rb.className = 'tab-btn text-xs font-bold px-4 py-2 rounded-lg border-2 ' +
+        (isReady ? 'tab-active-ready border-green-700' : 'border-green-300 text-green-700');
+    nb.className = 'tab-btn text-xs font-bold px-4 py-2 rounded-lg border-2 ' +
+        (!isReady ? 'tab-active-nophoto border-amber-500' : 'border-amber-300 text-amber-700');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER TABLE ROWS
+// ═══════════════════════════════════════════════════════════════════
+function renderModalTables(ready, noPhoto) {
+    const q = (document.getElementById('modalSearch')?.value || '').toLowerCase();
+
+    const fReady = q ? ready.filter(s =>
+        s.full_name.toLowerCase().includes(q) || s.reg_number.toLowerCase().includes(q)) : ready;
+
+    // Ready table
+    const tbody = document.getElementById('readyTableBody');
+    if (!fReady.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400 text-xs">No students match your search</td></tr>`;
+    } else {
+        tbody.innerHTML = fReady.map(s => {
+            const initials = s.full_name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+            const checked  = selectedSet.has(s.reg_number);
+            const reg      = escH(s.reg_number);
+            return `<tr class="student-row border-b border-gray-50 ${checked ? 'selected' : ''}" id="row_${reg}" onclick="toggleRow('${reg}')">
+                <td class="py-2 px-3">
+                    <input type="checkbox" class="row-chk w-4 h-4 cursor-pointer" ${checked ? 'checked' : ''}
+                        onchange="event.stopPropagation();toggleRow('${reg}')"/>
+                </td>
+                <td class="py-2 px-3">
+                    <img src="${escH(s.profileURL)}" class="thumb-img" alt=""
+                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+                    <div class="thumb-placeholder" style="display:none">${escH(initials)}</div>
+                </td>
+                <td class="py-2 px-3 font-semibold text-gray-800 max-w-[160px] truncate">${escH(s.full_name)}</td>
+                <td class="py-2 px-3 font-mono font-bold text-green-700">${reg}</td>
+                <td class="py-2 px-3 text-gray-600">${escH(s.phoneNumber || '—')}</td>
+            </tr>`;
+        }).join('');
+    }
+
+    // No-photo table
+    const fNoPhoto = q ? noPhoto.filter(s =>
+        s.full_name.toLowerCase().includes(q) || s.reg_number.toLowerCase().includes(q)) : noPhoto;
+
+    const ntbody = document.getElementById('noPhotoTableBody');
+    if (!fNoPhoto.length) {
+        ntbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-green-600 font-bold text-xs">🎉 All students have profile photos!</td></tr>`;
+    } else {
+        ntbody.innerHTML = fNoPhoto.map((s, i) => `
+            <tr class="border-b border-amber-50 hover:bg-amber-50">
+                <td class="py-2 px-3 text-amber-600 font-bold text-xs">${i + 1}</td>
+                <td class="py-2 px-3 font-semibold text-gray-800 text-xs">${escH(s.full_name)}</td>
+                <td class="py-2 px-3 font-mono font-bold text-amber-700 text-xs">${escH(s.reg_number)}</td>
+                <td class="py-2 px-3 text-gray-600 text-xs">${escH(s.phoneNumber || '—')}</td>
+                <td class="py-2 px-3 text-xs"><span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">No Photo</span></td>
+            </tr>`).join('');
+    }
+
+    syncMasterCheck();
+    updateStats();
+}
+
+function updateStats() {
+    document.getElementById('statReady').textContent    = readyStudents.length;
+    document.getElementById('statNoPhoto').textContent  = noPhotoStudents.length;
+    document.getElementById('statSelected').textContent = selectedSet.size;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SELECTION LOGIC
+// ═══════════════════════════════════════════════════════════════════
+function toggleRow(reg) {
+    if (selectedSet.has(reg)) { selectedSet.delete(reg); } else { selectedSet.add(reg); }
+    const row = document.getElementById('row_' + reg);
+    if (row) {
+        row.classList.toggle('selected', selectedSet.has(reg));
+        const chk = row.querySelector('.row-chk');
+        if (chk) chk.checked = selectedSet.has(reg);
+    }
+    syncMasterCheck();
+    updateStats();
+}
+
+function selectAll() {
+    readyStudents.forEach(s => selectedSet.add(s.reg_number));
+    renderModalTables(readyStudents, noPhotoStudents);
+}
+
+function deselectAll() {
+    selectedSet.clear();
+    renderModalTables(readyStudents, noPhotoStudents);
+}
+
+function toggleMaster(chk) {
+    if (chk.checked) { selectAll(); } else { deselectAll(); }
+}
+
+function syncMasterCheck() {
+    const mc = document.getElementById('masterCheck');
+    if (!mc || !readyStudents.length) return;
+    mc.indeterminate = selectedSet.size > 0 && selectedSet.size < readyStudents.length;
+    mc.checked = !mc.indeterminate && selectedSet.size === readyStudents.length;
+}
+
+document.getElementById('modalSearch').addEventListener('input', function() {
+    renderModalTables(readyStudents, noPhotoStudents);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// EXPORT ENGINE
+// ═══════════════════════════════════════════════════════════════════
+async function startAssetsExport() {
+    if (!selectedSet.size) { alert('Please select at least one student to export.'); return; }
+
+    const toExport = readyStudents.filter(s => selectedSet.has(s.reg_number));
+    if (!toExport.length) { alert('No selected students with photos.'); return; }
+
+    const btn       = document.getElementById('startExportBtn');
+    const progSec   = document.getElementById('exportProgressSection');
+    const actionDiv = document.getElementById('exportActionBtns');
+    const cancelBtn = actionDiv.querySelector('button:first-child');
+
+    btn.disabled     = true;
+    cancelBtn.disabled = true;
+    btn.innerHTML    = `<span class="spinner"></span>&nbsp; Exporting...`;
+    progSec.classList.remove('hidden');
+
+    function setP(done, total, name, msg) {
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        document.getElementById('exportProgressBar').style.width   = pct + '%';
+        document.getElementById('exportPctText').textContent        = pct + '%';
+        document.getElementById('exportCountText').textContent      = `${done} / ${total} students`;
+        document.getElementById('exportCurrentStudent').textContent = name || '';
+        document.getElementById('exportStatusText').textContent     = msg  || 'Generating assets...';
+    }
+
+    try {
+        const zip   = new JSZip();
+        const root  = zip.folder('NAPSS_Assets');
+        const total = toExport.length;
+
+        for (let i = 0; i < toExport.length; i++) {
+            const s = toExport[i];
+            setP(i, total, s.full_name, `Processing ${i + 1} of ${total}: ${s.full_name}`);
+
+            // Folder name: reg_number + sanitised name
+            const safeName   = (s.full_name || 'unknown').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+            const folderName = `${s.reg_number}_${safeName}`;
+            const sf         = root.folder(folderName);
+
+            // 1. Generate QR codes
+            const virtualURL = `https://napss-nau.vercel.app/stu/${s.reg_number}`;
+            const [vQR, sQR] = await Promise.all([
+                makeQRDataURL(virtualURL, 300),
+                makeQRDataURL(s.reg_number, 300)
+            ]);
+            if (vQR) sf.file('virtual_qr.png',   dataURLtoUint8(vQR));
+            if (sQR) sf.file('scannable_qr.png', dataURLtoUint8(sQR));
+
+            // 2. Profile photo
+            setP(i, total, s.full_name, `Fetching photo (${i + 1}/${total})...`);
+            const imgDataURL = await fetchImageAsDataURL(s.profileURL);
+            if (imgDataURL) {
+                const mimeMatch = imgDataURL.match(/^data:(image\/[a-z+]+);base64,/);
+                const ext = mimeMatch
+                    ? (mimeMatch[1] === 'image/png' ? 'png' : mimeMatch[1] === 'image/webp' ? 'webp' : 'jpg')
+                    : 'jpg';
+                sf.file(`profile.${ext}`, dataURLtoUint8(imgDataURL));
+            }
+
+            // 3. Metadata PDF
+            const pdfBuf = buildMetadataPDF(s);
+            sf.file('profile.pdf', pdfBuf);
         }
 
-        // Search functionality
-        document.getElementById('searchInput').addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase().trim();
-            
-            if (searchTerm === '') {
-                filteredStudents = allStudents;
-            } else {
-                filteredStudents = allStudents.filter(student => 
-                    student.full_name.toLowerCase().includes(searchTerm) ||
-                    student.reg_number.toLowerCase().includes(searchTerm)
-                );
-            }
-            
-            document.getElementById('filteredCount').textContent = filteredStudents.length;
-            renderStudents(filteredStudents);
+        setP(total, total, '', 'Compressing ZIP...');
+        const zipBlob = await zip.generateAsync({
+            type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 }
         });
 
-        // Helper function to escape HTML
-        function escapeHtml(text) {
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
+        // Finish
+        document.getElementById('exportProgressBar').classList.remove('progress-shimmer');
+        document.getElementById('exportProgressBar').style.background = '#059669';
+        setP(total, total, '✓ Download starting!', 'NAPSS_Assets.zip ready');
 
-        // Initialize
-        loadStudents();
-    </script>
+        const a    = document.createElement('a');
+        a.href     = URL.createObjectURL(zipBlob);
+        a.download = 'NAPSS_Assets.zip';
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        setTimeout(() => {
+            btn.disabled     = false;
+            cancelBtn.disabled = false;
+            btn.innerHTML    = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg> Export Selected as ZIP`;
+        }, 3000);
+
+    } catch(e) {
+        console.error('Export error:', e);
+        alert('Export failed: ' + e.message);
+        btn.disabled     = false;
+        cancelBtn.disabled = false;
+        btn.innerHTML    = 'Export Selected as ZIP';
+    }
+}
+
+// ─── INIT ───
+loadStudents();
+document.getElementById('assetsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAssetsModal();
+});
+</script>
 </body>
 </html>
