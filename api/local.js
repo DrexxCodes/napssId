@@ -2,19 +2,22 @@
 
 let cardData = [];
 
-// Fetch data from JSON file
+// Fetch data from the correct JSON file based on current mode
 async function fetchCardData() {
+    // Read mode set by the toggle in index.html
+    const mode     = window.currentMode || 'regular';
+    const jsonFile = mode === 'cep' ? 'api/cep.json' : 'api/data.json';
+
     try {
-        const response = await fetch('api/data.json');
+        const response = await fetch(jsonFile);
         if (!response.ok) {
-            throw new Error('Failed to fetch data');
+            throw new Error(`Failed to fetch ${jsonFile}`);
         }
         cardData = await response.json();
-        // Stats section removed, so no need to update total records
         return cardData;
     } catch (error) {
         console.error('Error fetching card data:', error);
-        showError('Failed to load database. Please refresh the page.');
+        showError(`Failed to load ${mode.toUpperCase()} database. Please refresh the page.`);
         return [];
     }
 }
@@ -69,6 +72,13 @@ function formatDateTime(dateTimeString) {
 async function displayResult(record) {
     const resultContent = document.getElementById('resultContent');
     const dateTime = formatDateTime(record.date);
+    const modeTag  = (window.currentMode === 'cep')
+        ? `<span class="ml-2 text-sm font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full align-middle">CEP</span>`
+        : `<span class="ml-2 text-sm font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full align-middle">Regular</span>`;
+
+    // Update the result section header to reflect current mode
+    const heading = document.querySelector('#resultSection h3');
+    if (heading) heading.innerHTML = `✅ Record Found ${modeTag}`;
     
     // Check if record exists in Firebase
     let cloudStatusHTML = '';
@@ -204,7 +214,10 @@ async function init() {
         hideAllSections();
         document.getElementById('loader').classList.remove('hidden');
         
-        // Simulate loading delay for better UX
+        // Always re-fetch the correct dataset for the current mode
+        // (user may have switched Regular ↔ CEP without reloading)
+        await fetchCardData();
+
         setTimeout(async () => {
             const results = searchByDigits(digits);
             
@@ -214,7 +227,8 @@ async function init() {
                 document.getElementById('loader').classList.add('hidden');
                 document.getElementById('resultSection').classList.remove('hidden');
             } else {
-                showError(`No record found for registration number ending with "${digits}". Please verify the digits and try again.`);
+                const modeLabel = (window.currentMode === 'cep') ? 'CEP' : 'Regular';
+                showError(`No ${modeLabel} record found for registration number ending with "${digits}". Please verify the digits and try again.`);
             }
         }, 800);
     });

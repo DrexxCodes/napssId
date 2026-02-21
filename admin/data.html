@@ -128,11 +128,15 @@
 
                         <!-- Profile Info -->
                         <div class="flex-1">
-                            <h2 id="studentName"
-                                class="text-3xl font-bold text-gray-800 mb-3 cursor-pointer hover:bg-yellow-100 transition-colors px-2 py-1 rounded"
-                                onclick="copyToClipboard(this.textContent, 'Name')" title="Click to copy">Loading...</h2>
-
-                            <div class="space-y-3">
+                            <div class="flex items-start gap-3 mb-3 flex-wrap">
+                                <h2 id="studentName"
+                                    class="text-3xl font-bold text-gray-800 cursor-pointer hover:bg-yellow-100 transition-colors px-2 py-1 rounded"
+                                    onclick="copyToClipboard(this.textContent, 'Name')" title="Click to copy">Loading...</h2>
+                                <span id="studentTypeBadge" class="mt-1.5 inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-extrabold bg-green-100 text-green-700 border border-green-300 hidden">
+                                    <span id="studentTypeDot" class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                                    <span id="studentTypeLabel">Regular</span>
+                                </span>
+                            </div>
                                 <div class="flex items-center">
                                     <svg class="w-5 h-5 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
@@ -150,10 +154,7 @@
                                     <span class="text-gray-600 font-semibold">Phone:</span>
                                     <span id="phoneNumber"
                                         class="ml-2 font-semibold text-gray-800 cursor-pointer hover:bg-yellow-100 transition-colors px-2 py-1 rounded"
-                                        onclick="copyToClipboard(this.textContent, 'Phone Number')" title="Click to copy">--</span>
-                                </div>
-
-                                <div class="flex items-center">
+                                <div class="space-y-3">
                                     <svg class="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                     </svg>
@@ -235,24 +236,41 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-let currentStudent   = null;  // local JSON data
-let currentFirestore = null;  // Firestore enrichment
+let currentStudent   = null;
+let currentFirestore = null;
 
-// ─── URL param ───
+// ─── Helpers ─────────────────────────────────────────────────────
 function getRegFromURL() {
     return new URLSearchParams(window.location.search).get('reg');
 }
 
-// ─── Load local JSON ───
-async function loadLocalStudent(reg) {
-    try {
-        const res  = await fetch('../api/data.json');
-        const list = await res.json();
-        return list.find(s => s.reg_number === reg) || null;
-    } catch { return null; }
+function isCepReg(reg) {
+    return String(reg).startsWith('2025133');
 }
 
-// ─── Load Firestore ───
+// ─── Load from the correct JSON based on reg prefix ──────────────
+async function loadLocalStudent(reg) {
+    const sources = isCepReg(reg)
+        ? ['../api/cep.json', '../api/data.json']   // try CEP first, fall back to regular
+        : ['../api/data.json', '../api/cep.json'];  // try regular first, fall back to CEP
+
+    for (const src of sources) {
+        try {
+            const res  = await fetch(src);
+            if (!res.ok) continue;
+            const list = await res.json();
+            const found = list.find(s => s.reg_number === reg);
+            if (found) {
+                // Tag the source type
+                found._type = src.includes('cep') ? 'cep' : 'regular';
+                return found;
+            }
+        } catch { /* try next */ }
+    }
+    return null;
+}
+
+// ─── Load Firestore ───────────────────────────────────────────────
 async function loadFirestore(reg) {
     try {
         const snap = await db.collection('enrollments').doc(reg).get();
@@ -260,7 +278,7 @@ async function loadFirestore(reg) {
     } catch { return null; }
 }
 
-// ─── Generate QR Code (display) ───
+// ─── Generate QR (display) ────────────────────────────────────────
 function generateQRCode(containerId, text) {
     const el = document.getElementById(containerId);
     el.innerHTML = '';
@@ -272,7 +290,7 @@ function generateQRCode(containerId, text) {
     });
 }
 
-// ─── QR dataURL for download ───
+// ─── QR dataURL for download ──────────────────────────────────────
 function makeQRDataURL(text, size) {
     return new Promise(resolve => {
         const div = document.createElement('div');
@@ -295,7 +313,7 @@ function makeQRDataURL(text, size) {
     });
 }
 
-// ─── Fetch image as dataURL ───
+// ─── Fetch image → dataURL ────────────────────────────────────────
 async function fetchImageAsDataURL(url) {
     if (!url) return null;
     try {
@@ -333,15 +351,16 @@ function dataURLtoUint8(dataURL) {
     return arr;
 }
 
-// ─── Build metadata PDF ───
+// ─── Metadata PDF (CEP-aware) ─────────────────────────────────────
 function buildMetadataPDF(student) {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
-    const W   = doc.internal.pageSize.getWidth();
-    const H   = doc.internal.pageSize.getHeight();
+    const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' });
+    const W    = doc.internal.pageSize.getWidth();
+    const H    = doc.internal.pageSize.getHeight();
+    const isCep = student._type === 'cep';
 
-    // Header bar
-    doc.setFillColor(6, 95, 70);
+    const [r,g,b] = isCep ? [37,99,235] : [6,95,70];
+    doc.setFillColor(r, g, b);
     doc.rect(0, 0, W, 30, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
@@ -350,14 +369,13 @@ function buildMetadataPDF(student) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.text('NATIONAL ASSOCIATION OF POLITICAL SCIENCE STUDENTS', W / 2, 20, { align: 'center' });
-    doc.text('NNAMDI AZIKIWE UNIVERSITY CHAPTER', W / 2, 26, { align: 'center' });
+    doc.text(isCep ? 'CONTINUING EDUCATION PROGRAMME (CEP)' : 'NNAMDI AZIKIWE UNIVERSITY CHAPTER', W / 2, 26, { align: 'center' });
 
-    // Fields
     let y = 46;
     function field(label, value) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
-        doc.setTextColor(6, 95, 70);
+        doc.setTextColor(...(isCep ? [37,99,235] : [6,95,70]));
         doc.text(label, 18, y);
         y += 6;
         doc.setFont('helvetica', 'normal');
@@ -373,6 +391,7 @@ function buildMetadataPDF(student) {
 
     field('FULL NAME',           student.full_name);
     field('REGISTRATION NUMBER', student.reg_number);
+    field('PROGRAMME',           isCep ? 'Continuing Education Programme (CEP)' : 'Regular');
     field('PHONE NUMBER',        student.phoneNumber || '—');
 
     y += 4;
@@ -381,13 +400,12 @@ function buildMetadataPDF(student) {
     doc.setTextColor(107, 114, 128);
     doc.text('Profile photo and QR codes are included separately in this folder.', 18, y, { maxWidth: W - 36 });
 
-    // Footer
     const footerY = H - 14;
     doc.setFillColor(243, 244, 246);
     doc.rect(0, footerY - 5, W, 19, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(6, 95, 70);
+    doc.setTextColor(...(isCep ? [37,99,235] : [6,95,70]));
     doc.text('Developed by Drexx Technologies', W / 2, footerY + 3, { align: 'center' });
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
@@ -416,49 +434,34 @@ async function downloadAllAssets() {
 
         const zip = new JSZip();
 
-        // 1. Generate both QRs
         btn.innerHTML = `<span class="btn-spinner"></span> Generating QR codes...`;
         const virtualURL = `https://napss-nau.vercel.app/stu/${s.reg_number}`;
-        const [vQR, sQR] = await Promise.all([
-            makeQRDataURL(virtualURL, 300),
-            makeQRDataURL(s.reg_number, 300)
-        ]);
+        const [vQR, sQR] = await Promise.all([makeQRDataURL(virtualURL, 300), makeQRDataURL(s.reg_number, 300)]);
         if (vQR) zip.file('virtual_qr.png',   dataURLtoUint8(vQR));
         if (sQR) zip.file('scannable_qr.png', dataURLtoUint8(sQR));
 
-        // 2. Profile photo
         if (s.profileURL) {
             btn.innerHTML = `<span class="btn-spinner"></span> Fetching photo...`;
             const imgDataURL = await fetchImageAsDataURL(s.profileURL);
             if (imgDataURL) {
                 const mimeMatch = imgDataURL.match(/^data:(image\/[a-z+]+);base64,/);
-                const ext = mimeMatch
-                    ? (mimeMatch[1] === 'image/png' ? 'png' : mimeMatch[1] === 'image/webp' ? 'webp' : 'jpg')
-                    : 'jpg';
+                const ext = mimeMatch ? (mimeMatch[1] === 'image/png' ? 'png' : mimeMatch[1] === 'image/webp' ? 'webp' : 'jpg') : 'jpg';
                 zip.file(`profile.${ext}`, dataURLtoUint8(imgDataURL));
             }
         }
 
-        // 3. Metadata PDF
         btn.innerHTML = `<span class="btn-spinner"></span> Building PDF...`;
-        const pdfBuf = buildMetadataPDF(s);
-        zip.file('profile.pdf', pdfBuf);
+        zip.file('profile.pdf', buildMetadataPDF(s));
 
-        // 4. Compress and download
         btn.innerHTML = `<span class="btn-spinner"></span> Compressing...`;
-        const zipBlob = await zip.generateAsync({
-            type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 }
-        });
+        const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 
-        const safeName   = (s.full_name || 'student').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
-        const zipName    = `${s.reg_number}_${safeName}.zip`;
-
-        const a    = document.createElement('a');
+        const safeName = (s.full_name || 'student').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+        const a = document.createElement('a');
         a.href     = URL.createObjectURL(zipBlob);
-        a.download = zipName;
+        a.download = `${s.reg_number}_${safeName}.zip`;
         a.click();
         URL.revokeObjectURL(a.href);
-
         showNotification('Assets downloaded successfully!');
 
     } catch(e) {
@@ -473,13 +476,29 @@ async function downloadAllAssets() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// DISPLAY PROFILE
+// DISPLAY PROFILE  (CEP-aware)
 // ═══════════════════════════════════════════════════════════════════
 async function displayProfile(localData, firestoreData) {
-    document.getElementById('studentName').textContent      = localData.full_name;
+    const isCep = localData._type === 'cep';
+
+    // Name + type badge
+    document.getElementById('studentName').textContent = localData.full_name;
+    const badge = document.getElementById('studentTypeBadge');
+    const dot   = document.getElementById('studentTypeDot');
+    const lbl   = document.getElementById('studentTypeLabel');
+    badge.classList.remove('hidden');
+    if (isCep) {
+        badge.className = badge.className.replace('bg-green-100 text-green-700 border-green-300','bg-blue-100 text-blue-700 border-blue-300');
+        dot.className   = dot.className.replace('bg-green-500','bg-blue-500');
+        lbl.textContent = 'CEP';
+    } else {
+        lbl.textContent = 'Regular';
+    }
+
     document.getElementById('regNumber').textContent        = localData.reg_number;
     document.getElementById('registrationDate').textContent = localData.date;
 
+    // Phone
     const phoneContainer = document.getElementById('phoneContainer');
     if (firestoreData?.phoneNumber) {
         document.getElementById('phoneNumber').textContent = firestoreData.phoneNumber;
@@ -487,24 +506,31 @@ async function displayProfile(localData, firestoreData) {
         phoneContainer.classList.add('hidden');
     }
 
+    // Photo
     const profileImage            = document.getElementById('profileImage');
     const profileImagePlaceholder = document.getElementById('profileImagePlaceholder');
-
     if (firestoreData?.profileURL) {
         profileImage.src = firestoreData.profileURL;
         profileImage.classList.remove('hidden');
         profileImagePlaceholder.classList.add('hidden');
-        document.getElementById('photoStatus').textContent  = '✔ Uploaded';
+        document.getElementById('photoStatus').textContent = '✔ Uploaded';
     } else {
-        document.getElementById('photoStatus').textContent  = 'No Photo';
+        document.getElementById('photoStatus').textContent = 'No Photo';
     }
 
     document.getElementById('cloudStatus').textContent = firestoreData ? '✔ Synced' : 'Local Only';
 
-    // QR codes (display only)
+    // QR codes (display)
     generateQRCode('virtualIdQR',   `https://napss-nau.vercel.app/stu/${localData.reg_number}`);
     generateQRCode('scannableIdQR', localData.reg_number);
     document.getElementById('scannableUrl').textContent = localData.reg_number;
+
+    // Colour-theme the profile status card header for CEP
+    const statusCard = document.querySelector('#profileContent .bg-white.rounded-xl.shadow-lg');
+    if (statusCard && isCep) {
+        const h3 = statusCard.querySelector('h3');
+        if (h3) h3.classList.add('text-blue-800');
+    }
 
     document.getElementById('loadingState').classList.add('hidden');
     document.getElementById('profileContent').classList.remove('hidden');
@@ -516,23 +542,17 @@ function showError(msg) {
     document.getElementById('errorState').classList.remove('hidden');
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// CLIPBOARD
-// ═══════════════════════════════════════════════════════════════════
+// ─── Clipboard ────────────────────────────────────────────────────
 function copyToClipboard(text, field) {
     const copy = () => showNotification(field + ' copied!');
     if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(text).then(copy).catch(() => fallbackCopy(text, field));
-    } else {
-        fallbackCopy(text, field);
-    }
+    } else { fallbackCopy(text, field); }
 }
 function fallbackCopy(text, field) {
     const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;left:-999999px';
-    document.body.appendChild(ta);
-    ta.select();
+    ta.value = text; ta.style.cssText = 'position:fixed;left:-999999px';
+    document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); showNotification(field + ' copied!'); } catch {}
     document.body.removeChild(ta);
 }
@@ -543,25 +563,22 @@ function showNotification(msg) {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg><span>${msg}</span>`;
     document.body.appendChild(n);
-    setTimeout(() => {
-        n.style.opacity    = '0';
-        n.style.transition = 'opacity 0.3s';
-        setTimeout(() => document.body.removeChild(n), 300);
-    }, 2500);
+    setTimeout(() => { n.style.opacity = '0'; n.style.transition = 'opacity 0.3s'; setTimeout(() => document.body.removeChild(n), 300); }, 2500);
 }
 
-window.copyToClipboard  = copyToClipboard;
+window.copyToClipboard   = copyToClipboard;
 window.downloadAllAssets = downloadAllAssets;
 
-// ═══════════════════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════════════════
+// ─── INIT ─────────────────────────────────────────────────────────
 async function initProfile() {
     const reg = getRegFromURL();
     if (!reg) { showError('No registration number provided in URL'); return; }
 
     const localData = await loadLocalStudent(reg);
-    if (!localData) { showError(`Student "${reg}" not found in local database`); return; }
+    if (!localData) {
+        showError(`Student "${reg}" not found in either Regular or CEP database`);
+        return;
+    }
 
     currentStudent   = localData;
     currentFirestore = await loadFirestore(reg);
@@ -570,6 +587,8 @@ async function initProfile() {
 }
 
 document.addEventListener('DOMContentLoaded', initProfile);
+</script>
+    
 </script>
 </body>
 </html>

@@ -80,30 +80,59 @@
                 <h2 class="text-2xl font-bold text-green-800 mb-4 text-center">
                     Search Card Record
                 </h2>
-                <p class="text-gray-600 text-center mb-6 text-sm md:text-base">
+
+                <!-- Mode Toggle -->
+                <div class="flex items-center justify-center gap-4 mb-6">
+                    <span id="labelRegular" class="text-sm font-bold text-green-700 transition-all">Regular</span>
+                    <button
+                        id="modeToggle"
+                        role="switch"
+                        aria-checked="false"
+                        onclick="toggleMode()"
+                        class="relative inline-flex items-center w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 bg-green-500"
+                        title="Switch between Regular and CEP"
+                    >
+                        <span
+                            id="toggleThumb"
+                            class="inline-block w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 translate-x-1"
+                        ></span>
+                    </button>
+                    <span id="labelCep" class="text-sm font-bold text-gray-400 transition-all">CEP</span>
+                </div>
+
+                <!-- Mode badge -->
+                <div class="flex justify-center mb-5">
+                    <span id="modeBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-300 transition-all">
+                        <span id="modeDot" class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                        <span id="modeLabel">Regular Mode</span>
+                    </span>
+                </div>
+
+                <p class="text-gray-600 text-center mb-6 text-sm md:text-base" id="modeDescription">
                     Enter the last 3 digits of your registration number
                 </p>
-                
+
                 <form id="searchForm" class="space-y-4">
                     <div>
-                        <label for="regDigits" class="block text-sm font-semibold text-gray-700 mb-2">
+                        <label for="regDigits" class="block text-sm font-semibold text-gray-700 mb-2" id="inputLabel">
                             Last 3 Digits of Reg Number (2025134***)
                         </label>
-                        <input 
-                            type="text" 
-                            id="regDigits" 
+                        <input
+                            type="text"
+                            id="regDigits"
                             maxlength="3"
                             placeholder="e.g., 123"
                             class="w-full px-4 py-3 border-2 border-green-300 rounded-lg focus:outline-none focus:border-green-500 transition-all text-lg text-center font-mono"
                             autocomplete="off"
                         />
-                        <p class="text-xs text-gray-500 mt-2 text-center">
+                        <p class="text-xs text-gray-500 mt-2 text-center" id="inputHint">
                             For entries without reg numbers, use: 001, 002, etc.
                         </p>
                     </div>
-                    
-                    <button 
+
+                    <button
                         type="submit"
+                        id="searchBtn"
                         class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-lg"
                     >
                         Search Record
@@ -188,10 +217,101 @@
         </div>
     </footer>
 
+    <style>
+        /* Toggle transition for input border colour */
+        #regDigits.cep-mode {
+            border-color: #3b82f6;
+        }
+        #regDigits.cep-mode:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        #searchBtn.cep-mode {
+            background-color: #2563eb;
+        }
+        #searchBtn.cep-mode:hover {
+            background-color: #1d4ed8;
+        }
+    </style>
+
+    <script>
+        // ─── MODE STATE ───────────────────────────────────────────────
+        // Exposed globally so local.js can read it
+        window.currentMode = 'regular'; // 'regular' | 'cep'
+
+        function toggleMode() {
+            const isCep   = window.currentMode === 'regular'; // about to switch TO cep
+            window.currentMode = isCep ? 'cep' : 'regular';
+            applyModeUI(isCep);
+        }
+
+        function applyModeUI(isCep) {
+            const toggle      = document.getElementById('modeToggle');
+            const thumb       = document.getElementById('toggleThumb');
+            const labelReg    = document.getElementById('labelRegular');
+            const labelCep    = document.getElementById('labelCep');
+            const badge       = document.getElementById('modeBadge');
+            const dot         = document.getElementById('modeDot');
+            const modeLabel   = document.getElementById('modeLabel');
+            const description = document.getElementById('modeDescription');
+            const inputLabel  = document.getElementById('inputLabel');
+            const inputHint   = document.getElementById('inputHint');
+            const input       = document.getElementById('regDigits');
+            const btn         = document.getElementById('searchBtn');
+
+            if (isCep) {
+                // Switch TO CEP
+                toggle.style.backgroundColor = '#2563eb';
+                toggle.setAttribute('aria-checked', 'true');
+                thumb.style.transform = 'translateX(calc(3.5rem - 1.25rem - 0.25rem))'; // slide right
+
+                labelReg.classList.replace('text-green-700','text-gray-400');
+                labelCep.classList.replace('text-gray-400','text-blue-600');
+                labelCep.classList.add('font-extrabold');
+
+                badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-300 transition-all';
+                dot.className   = 'w-2 h-2 rounded-full bg-blue-500 inline-block';
+                modeLabel.textContent   = 'CEP Mode';
+                description.textContent = 'Enter the last 3 digits of your CEP registration number';
+                inputLabel.textContent  = 'Last 3 Digits of CEP Reg Number';
+                inputHint.textContent   = 'Searches the CEP student database';
+
+                input.classList.add('cep-mode');
+                btn.classList.add('cep-mode');
+                btn.style.backgroundImage = 'none';
+            } else {
+                // Switch BACK TO Regular
+                toggle.style.backgroundColor = '#22c55e';
+                toggle.setAttribute('aria-checked', 'false');
+                thumb.style.transform = 'translateX(0.25rem)'; // slide left
+
+                labelReg.classList.replace('text-gray-400','text-green-700');
+                labelCep.classList.replace('text-blue-600','text-gray-400');
+                labelCep.classList.remove('font-extrabold');
+
+                badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-300 transition-all';
+                dot.className   = 'w-2 h-2 rounded-full bg-green-500 inline-block';
+                modeLabel.textContent   = 'Regular Mode';
+                description.textContent = 'Enter the last 3 digits of your registration number';
+                inputLabel.textContent  = 'Last 3 Digits of Reg Number (2025134***)';
+                inputHint.textContent   = 'For entries without reg numbers, use: 001, 002, etc.';
+
+                input.classList.remove('cep-mode');
+                btn.classList.remove('cep-mode');
+                btn.style.backgroundImage = '';
+            }
+
+            // Clear any previous results when switching mode
+            hideAllSections();
+            document.getElementById('regDigits').value = '';
+            document.getElementById('regDigits').focus();
+        }
+    </script>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    
+
     <!-- Application Scripts -->
     <script src="api/online.js"></script>
     <script src="api/local.js"></script>
