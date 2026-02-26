@@ -2,11 +2,17 @@
 
 let cardData = [];
 
-// Fetch data from the correct JSON file based on current mode
+// Fetch data from the correct JSON file based on current mode AND identifier type
 async function fetchCardData() {
-    // Read mode set by the toggle in index.html
-    const mode     = window.currentMode || 'regular';
-    const jsonFile = mode === 'cep' ? 'api/cep.json' : 'api/data.json';
+    const mode       = window.currentMode       || 'regular'; // 'regular' | 'cep'
+    const identifier = window.currentIdentifier || 'reg';     // 'reg' | 'phone'
+
+    let jsonFile;
+    if (identifier === 'phone') {
+        jsonFile = mode === 'cep' ? 'api/cep_phone.json' : 'api/regular_phone.json';
+    } else {
+        jsonFile = mode === 'cep' ? 'api/cep.json' : 'api/data.json';
+    }
 
     try {
         const response = await fetch(jsonFile);
@@ -22,48 +28,41 @@ async function fetchCardData() {
     }
 }
 
-// Search for a record by last 3 digits
+// Search by last 3 digits of reg number
 function searchByDigits(digits) {
-    // Ensure digits is a string with 3 characters
     const searchDigits = digits.toString().padStart(3, '0');
-    
-    // Search for matching records
-    const results = cardData.filter(record => {
+
+    return cardData.filter(record => {
         const regNumber = record.reg_number.toString();
-        
-        // For standard reg numbers (2025134XXX), check last 3 digits
+
         if (regNumber.startsWith('2025134')) {
             return regNumber.slice(-3) === searchDigits;
         }
-        
-        // For other reg numbers, check if they end with the digits
-        if (regNumber.endsWith(searchDigits)) {
-            return true;
-        }
-        
-        // For assigned numbers (001, 002, etc.), match exactly
-        if (regNumber === searchDigits) {
-            return true;
-        }
-        
+        if (regNumber.endsWith(searchDigits)) return true;
+        if (regNumber === searchDigits) return true;
+
         return false;
     });
-    
-    return results;
+}
+
+// Search by last 4 digits of phone number
+function searchByPhone(digits) {
+    const searchDigits = digits.toString().padStart(4, '0');
+
+    return cardData.filter(record => {
+        // Support phone_number field or fallback to reg_number
+        const phone = (record.phone_number || record.reg_number || '').toString().replace(/\D/g, '');
+        return phone.slice(-4) === searchDigits;
+    });
 }
 
 // Format date and time
 function formatDateTime(dateTimeString) {
-    // Input format: "04-02-2026 16:19:26"
     const parts = dateTimeString.split(' ');
     if (parts.length !== 2) return { date: dateTimeString, time: '' };
-    
-    const datePart = parts[0]; // "04-02-2026"
-    const timePart = parts[1]; // "16:19:26"
-    
     return {
-        date: datePart,
-        time: timePart,
+        date: parts[0],
+        time: parts[1],
         full: dateTimeString
     };
 }
@@ -71,26 +70,22 @@ function formatDateTime(dateTimeString) {
 // Display search result
 async function displayResult(record) {
     const resultContent = document.getElementById('resultContent');
-    const dateTime = formatDateTime(record.date);
-    const modeTag  = (window.currentMode === 'cep')
+    const dateTime      = formatDateTime(record.date);
+    const modeTag = (window.currentMode === 'cep')
         ? `<span class="ml-2 text-sm font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full align-middle">CEP</span>`
         : `<span class="ml-2 text-sm font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full align-middle">Regular</span>`;
 
-    // Update the result section header to reflect current mode
     const heading = document.querySelector('#resultSection h3');
     if (heading) heading.innerHTML = `✅ Record Found ${modeTag}`;
-    
-    // Check if record exists in Firebase
+
     let cloudStatusHTML = '';
-    let cameraHTML = '';
-    let inCloud = false;
-    
+    let cameraHTML      = '';
+    let inCloud         = false;
+
     try {
         if (window.onlineDB) {
             inCloud = await window.onlineDB.checkEnrollment(record.reg_number);
             cloudStatusHTML = window.onlineDB.showCloudStatus(inCloud);
-            
-            // Only show camera if record is in cloud
             if (inCloud) {
                 cameraHTML = window.onlineDB.showCameraSection(record.reg_number);
             }
@@ -98,9 +93,20 @@ async function displayResult(record) {
     } catch (error) {
         console.error('Error checking cloud status:', error);
     }
-    
-    resultContent.innerHTML = `
-        <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
+
+    // Identifier row — phone vs reg number
+    const isPhone = window.currentIdentifier === 'phone';
+    const identifierRow = isPhone
+        ? `<div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-lg">
+            <div class="flex items-center mb-2">
+                <svg class="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                </svg>
+                <span class="font-semibold text-yellow-800">Phone Identifier (last 4 digits)</span>
+            </div>
+            <p class="text-2xl font-bold text-yellow-900 font-mono">***${(record.phone_number || '').toString().slice(-4)}</p>
+           </div>`
+        : `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg">
             <div class="flex items-center mb-2">
                 <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"></path>
@@ -108,8 +114,11 @@ async function displayResult(record) {
                 <span class="font-semibold text-green-800">Registration Number</span>
             </div>
             <p class="text-2xl font-bold text-green-900 font-mono">${record.reg_number}</p>
-        </div>
-        
+           </div>`;
+
+    resultContent.innerHTML = `
+        ${identifierRow}
+
         <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
             <div class="flex items-center mb-2">
                 <svg class="w-5 h-5 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,7 +128,7 @@ async function displayResult(record) {
             </div>
             <p class="text-xl font-semibold text-blue-900">${record.full_name}</p>
         </div>
-        
+
         <div class="bg-purple-50 border-l-4 border-purple-500 p-4 rounded-r-lg">
             <div class="flex items-center mb-2">
                 <svg class="w-5 h-5 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,7 +138,7 @@ async function displayResult(record) {
             </div>
             <p class="text-lg font-semibold text-purple-900">${dateTime.date}</p>
         </div>
-        
+
         <div class="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg">
             <div class="flex items-center mb-2">
                 <svg class="w-5 h-5 text-orange-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,7 +148,7 @@ async function displayResult(record) {
             </div>
             <p class="text-lg font-semibold text-orange-900">${dateTime.time}</p>
         </div>
-        
+
         <div class="bg-gradient-to-r from-green-100 to-emerald-100 p-4 rounded-lg mt-2">
             <div class="flex items-center justify-center text-green-700">
                 <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,12 +157,11 @@ async function displayResult(record) {
                 <span class="font-semibold">Card Verified Successfully</span>
             </div>
         </div>
-        
+
         ${cloudStatusHTML}
         ${cameraHTML}
     `;
-    
-    // Initialize camera controls if record is in cloud
+
     if (inCloud && window.onlineDB) {
         window.onlineDB.initializeCameraControls(record.reg_number);
     }
@@ -161,11 +169,11 @@ async function displayResult(record) {
 
 // Show error message
 function showError(message) {
-    const errorSection = document.getElementById('errorSection');
-    const errorMessage = document.getElementById('errorMessage');
-    const loader = document.getElementById('loader');
+    const errorSection  = document.getElementById('errorSection');
+    const errorMessage  = document.getElementById('errorMessage');
+    const loader        = document.getElementById('loader');
     const resultSection = document.getElementById('resultSection');
-    
+
     loader.classList.add('hidden');
     resultSection.classList.add('hidden');
     errorMessage.textContent = message;
@@ -179,77 +187,86 @@ function hideAllSections() {
     document.getElementById('errorSection').classList.add('hidden');
 }
 
+// Core search & display logic (shared between form submit and auto-search)
+async function performSearch(digits) {
+    hideAllSections();
+    document.getElementById('loader').classList.remove('hidden');
+
+    // Always re-fetch for current mode + identifier combination
+    await fetchCardData();
+
+    setTimeout(async () => {
+        const isPhone = window.currentIdentifier === 'phone';
+        const results = isPhone ? searchByPhone(digits) : searchByDigits(digits);
+
+        if (results.length > 0) {
+            await displayResult(results[0]);
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+        } else {
+            const modeLabel = (window.currentMode === 'cep') ? 'CEP' : 'Regular';
+            const idLabel   = isPhone ? 'phone number ending with' : 'registration number ending with';
+            showError(`No ${modeLabel} record found for ${idLabel} "${digits}". Please verify the digits and try again.`);
+        }
+    }, 800);
+}
+
 // Initialize the application
 async function init() {
     await fetchCardData();
-    
-    // Initialize Firebase
+
     if (window.onlineDB) {
         await window.onlineDB.initialize();
     }
-    
-    const searchForm = document.getElementById('searchForm');
+
+    const searchForm     = document.getElementById('searchForm');
     const regDigitsInput = document.getElementById('regDigits');
     const closeResultBtn = document.getElementById('closeResult');
-    const closeErrorBtn = document.getElementById('closeError');
-    
-    // Only allow numbers in input
-    regDigitsInput.addEventListener('input', function(e) {
+    const closeErrorBtn  = document.getElementById('closeError');
+
+    // Only allow numbers in input + auto-search on reaching required length
+    regDigitsInput.addEventListener('input', function () {
         this.value = this.value.replace(/[^0-9]/g, '');
+
+        const isPhone   = window.currentIdentifier === 'phone';
+        const maxDigits = isPhone ? 4 : 3;
+
+        if (this.value.length === maxDigits) {
+            performSearch(this.value);
+        }
     });
-    
-    // Handle form submission
-    searchForm.addEventListener('submit', async function(e) {
+
+    // Manual form submission (button click or Enter key)
+    searchForm.addEventListener('submit', async function (e) {
         e.preventDefault();
-        
-        const digits = regDigitsInput.value.trim();
-        
-        // Validate input
-        if (digits.length !== 3) {
-            showError('Please enter exactly 3 digits.');
+
+        const digits   = regDigitsInput.value.trim();
+        const isPhone  = window.currentIdentifier === 'phone';
+        const required = isPhone ? 4 : 3;
+
+        if (digits.length !== required) {
+            showError(`Please enter exactly ${required} digits.`);
             return;
         }
-        
-        // Show loader
-        hideAllSections();
-        document.getElementById('loader').classList.remove('hidden');
-        
-        // Always re-fetch the correct dataset for the current mode
-        // (user may have switched Regular ↔ CEP without reloading)
-        await fetchCardData();
 
-        setTimeout(async () => {
-            const results = searchByDigits(digits);
-            
-            if (results.length > 0) {
-                // Display first matching result
-                await displayResult(results[0]);
-                document.getElementById('loader').classList.add('hidden');
-                document.getElementById('resultSection').classList.remove('hidden');
-            } else {
-                const modeLabel = (window.currentMode === 'cep') ? 'CEP' : 'Regular';
-                showError(`No ${modeLabel} record found for registration number ending with "${digits}". Please verify the digits and try again.`);
-            }
-        }, 800);
+        performSearch(digits);
     });
-    
+
     // Close result
-    closeResultBtn.addEventListener('click', function() {
+    closeResultBtn.addEventListener('click', function () {
         hideAllSections();
         regDigitsInput.value = '';
         regDigitsInput.focus();
     });
-    
+
     // Close error
-    closeErrorBtn.addEventListener('click', function() {
+    closeErrorBtn.addEventListener('click', function () {
         hideAllSections();
         regDigitsInput.value = '';
         regDigitsInput.focus();
     });
-    
-    // Focus input on page load
+
     regDigitsInput.focus();
 }
 
-// Start the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', init);
