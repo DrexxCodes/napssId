@@ -78,16 +78,18 @@ async function displayResult(record) {
     const heading = document.querySelector('#resultSection h3');
     if (heading) heading.innerHTML = `✅ Record Found ${modeTag}`;
 
-    let cloudStatusHTML = '';
-    let cameraHTML      = '';
-    let inCloud         = false;
+    let cloudStatusHTML  = '';
+    let cameraHTML       = '';
+    let inCloud          = false;
+    let existingPhotoURL = null;
 
     try {
         if (window.onlineDB) {
-            inCloud = await window.onlineDB.checkEnrollment(record.reg_number);
-            cloudStatusHTML = window.onlineDB.showCloudStatus(inCloud);
+            inCloud          = await window.onlineDB.checkEnrollment(record.reg_number);
+            existingPhotoURL = inCloud ? await window.onlineDB.checkIfAlreadyCaptured(record.reg_number) : null;
+            cloudStatusHTML  = window.onlineDB.showCloudStatus(inCloud, existingPhotoURL);
             if (inCloud) {
-                cameraHTML = window.onlineDB.showCameraSection(record.reg_number);
+                cameraHTML = window.onlineDB.showCameraSection(record.reg_number, !!existingPhotoURL);
             }
         }
     } catch (error) {
@@ -163,7 +165,7 @@ async function displayResult(record) {
     `;
 
     if (inCloud && window.onlineDB) {
-        window.onlineDB.initializeCameraControls(record.reg_number);
+        window.onlineDB.initializeCameraControls(record.reg_number, existingPhotoURL);
     }
 }
 
